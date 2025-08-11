@@ -1,0 +1,28 @@
+# <type>: <subject>
+#
+# <body>
+#
+# <footer>
+#
+# Type can be:
+#   feat     (new feature)
+#   fix      (bug fix)
+#   refactor (refactoring code)
+#   style    (formatting, no functional changes)
+#   docs     (documentation)
+#   test     (adding or modifying tests)
+#   chore    (updating build tasks, package manager configs, etc)
+#
+# Subject line rules:
+#   - Use imperative mood ("Add feature" not "Added feature")
+#   - Keep under 50 characters
+#   - Don't end with period
+#
+# Body rules:
+#   - Wrap at 72 characters
+#   - Explain what and why, not how
+#   - Can use multiple paragraphs with blank lines between them
+#
+# Footer rules:
+#   - Reference issues and pull requests
+#   - Breaking changes start with BREAKING CHANGE:
