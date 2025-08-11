@@ -40,8 +40,9 @@ yarn-error.*
 *.tsbuildinfo
 
 # Additional React Native / Expo
-android/app/build/
-ios/build/
+# Note: android/ and ios/ directories not tracked for Expo Go development
+android/
+ios/
 *.flipper/
 
 # IDE files
