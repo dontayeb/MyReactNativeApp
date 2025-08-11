@@ -88,18 +88,6 @@ export const NotificationSettingsScreen: React.FC<NotificationSettingsScreenProp
     }
   };
 
-  const testNotification = async () => {
-    try {
-      // Schedule a test payment reminder
-      const testDate = new Date();
-      testDate.setSeconds(testDate.getSeconds() + 5); // 5 seconds from now
-      await notificationService.schedulePaymentReminder('test-loan', 'Test Loan', testDate, 500, 'USD');
-      Alert.alert('Success', 'Test payment reminder scheduled for 5 seconds from now!');
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      Alert.alert('Error', 'Failed to send test notification');
-    }
-  };
 
   const styles = StyleSheet.create({
     container: {
@@ -181,18 +169,6 @@ export const NotificationSettingsScreen: React.FC<NotificationSettingsScreenProp
       height: 55,
       paddingHorizontal: 12,
       paddingVertical: 8,
-    },
-    testButton: {
-      backgroundColor: theme.colors.primary,
-      borderRadius: 12,
-      padding: 16,
-      alignItems: 'center',
-      marginTop: 10,
-    },
-    testButtonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: '600',
     },
     infoCard: {
       backgroundColor: theme.colors.primary + '15',
@@ -310,12 +286,6 @@ export const NotificationSettingsScreen: React.FC<NotificationSettingsScreenProp
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Test Notifications</Text>
-          <TouchableOpacity style={styles.testButton} onPress={testNotification}>
-            <Text style={styles.testButtonText}>Send Test Notification</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
