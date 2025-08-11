@@ -15,12 +15,13 @@ A comprehensive React Native mobile application for personal financial tracking 
 ## Tech Stack
 
 - **Framework**: React Native with Expo SDK 53
+- **Development**: Expo Go for rapid testing and development
 - **Database**: Supabase (PostgreSQL) with Row Level Security
 - **Authentication**: Supabase Auth
 - **Encryption**: Client-side AES-256 encryption
 - **State Management**: React Context API
 - **Navigation**: React Navigation
-- **Build System**: EAS Build
+- **Build System**: EAS Build (for production)
 - **Languages**: TypeScript, JavaScript
 
 ## Getting Started
@@ -47,30 +48,41 @@ A comprehensive React Native mobile application for personal financial tracking 
 
 3. Set up environment variables:
    ```bash
-   cp .env.example .env
-   # Edit .env with your Supabase credentials
+   # Create .env file with your Supabase credentials
+   # (See Environment Variables section below)
    ```
 
 4. Start the development server:
    ```bash
-   npx expo start
+   npm start
+   # or
+   npx expo start --go
    ```
+
+5. **Test with Expo Go**:
+   - Install Expo Go on your device from the App Store or Google Play
+   - Scan the QR code displayed in your terminal or browser
+   - Your app will load in Expo Go for instant testing
 
 ### Building for Production
 
-1. Configure EAS Build:
+To build for production, you'll need to restore the EAS Build configuration:
+
+1. Restore EAS configuration:
+   ```bash
+   mv eas.json.backup eas.json
+   npx expo install expo-dev-client
+   ```
+
+2. Configure EAS Build:
    ```bash
    npx eas build:configure
    ```
 
-2. Build for Android:
+3. Build for production:
    ```bash
-   npx eas build --platform android
-   ```
-
-3. Build for iOS:
-   ```bash
-   npx eas build --platform ios
+   npx eas build --platform android --profile production
+   npx eas build --platform ios --profile production
    ```
 
 ## Environment Variables
