@@ -32,6 +32,66 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env.production
+.env.staging
+.env
 
 # typescript
 *.tsbuildinfo
+
+# Additional React Native / Expo
+android/app/build/
+ios/build/
+*.flipper/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS generated files
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+logs
+*.log
+
+# Cache
+*.cache
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# EAS Build
+eas.json.bak
+
+# Sensitive data (financial app specific)
+# These should never be committed
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+
+# Test files (if you add them later)
+# Uncomment if you create test files
+# __tests__/
+# *.test.js
+# *.spec.js
