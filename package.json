@@ -8,7 +8,12 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "tunnel": "expo start --tunnel"
+    "tunnel": "expo start --tunnel",
+    "switch:production": "./scripts/switch-to-production.sh",
+    "switch:development": "./scripts/switch-to-development.sh",
+    "build:android": "npm run switch:production && eas build --platform android --profile production",
+    "build:ios": "npm run switch:production && eas build --platform ios --profile production",
+    "build:preview": "npm run switch:production && eas build --platform android --profile preview"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
