@@ -12,7 +12,7 @@ echo "✅ EAS configuration already available"
 
 # Install production dependencies
 echo "📦 Installing production dependencies..."
-npx expo install expo-dev-client expo-updates
+npx expo install expo-dev-client expo-updates expo-navigation-bar
 
 # Update app.json for production
 echo "⚙️ Updating app.json for production builds..."

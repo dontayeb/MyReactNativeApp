@@ -2,7 +2,13 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-gesture-handler';
 import { Platform } from 'react-native';
-import * as NavigationBar from 'expo-navigation-bar';
+// Conditional import for expo-navigation-bar to prevent build failures
+let NavigationBar = null;
+try {
+  NavigationBar = require('expo-navigation-bar');
+} catch (error) {
+  console.warn('expo-navigation-bar not available, navigation bar styling will be skipped');
+}
 
 // Suppress crypto-js warnings
 import { LogBox } from 'react-native';
@@ -64,10 +70,14 @@ const AppContent = () => {
   
   // Set system navigation bar color and style
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      // Now we can control both background color and button style
-      NavigationBar.setBackgroundColorAsync(theme.colors.card);
-      NavigationBar.setButtonStyleAsync(theme.isDark ? 'light' : 'dark');
+    if (Platform.OS === 'android' && NavigationBar) {
+      try {
+        // Now we can control both background color and button style
+        NavigationBar.setBackgroundColorAsync(theme.colors.card);
+        NavigationBar.setButtonStyleAsync(theme.isDark ? 'light' : 'dark');
+      } catch (error) {
+        console.warn('Failed to set navigation bar style:', error);
+      }
     }
   }, [theme]);
   
