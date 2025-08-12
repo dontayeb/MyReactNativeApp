@@ -6,6 +6,7 @@ import { useLocalization } from '../../contexts/LocalizationContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { FriendlyErrorModal } from '../../components/FriendlyErrorModal';
+import { PasswordInput } from '../../components/PasswordInput';
 
 interface SignInScreenProps {
   navigation: any;
@@ -14,7 +15,6 @@ interface SignInScreenProps {
 export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorModal, setErrorModal] = useState<{
     visible: boolean;
@@ -158,9 +158,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
       fontSize: 16,
       color: theme.colors.text,
     },
-    passwordToggle: {
-      padding: 12,
-    },
     signInButton: {
       backgroundColor: theme.colors.primary,
       height: 50,
@@ -219,8 +216,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
     <View style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <LinearGradient
           colors={theme.isDark ? ['#1a1a1a', '#2d2d2d'] : ['#f8f9fa', '#e9ecef']}
@@ -253,29 +250,15 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
             </View>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>{t('password')}</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                placeholder="Enter your password"
-                placeholderTextColor={theme.colors.textSecondary}
-              />
-              <TouchableOpacity
-                style={styles.passwordToggle}
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <PasswordInput
+            label={t('password')}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            showRequirements={false}
+            showStrength={false}
+            testID="signin-password-input"
+          />
 
           <TouchableOpacity
             style={styles.signInButton}
