@@ -38,6 +38,7 @@ jobs:
         run: |
           rm -f yarn.lock
           npm ci
+          npx expo install --fix
 
       - name: Switch to production environment
         run: npm run switch:production
