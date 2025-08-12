@@ -2,15 +2,13 @@
 
 echo "🔧 Switching to Production Build Configuration..."
 
-# Check if eas.json.backup exists
-if [ ! -f "eas.json.backup" ]; then
-    echo "❌ eas.json.backup not found! Cannot switch to production."
+# Check if eas.json exists
+if [ ! -f "eas.json" ]; then
+    echo "❌ eas.json not found! Cannot switch to production."
     exit 1
 fi
 
-# Restore EAS configuration
-mv eas.json.backup eas.json
-echo "✅ Restored eas.json"
+echo "✅ EAS configuration already available"
 
 # Install production dependencies
 echo "📦 Installing production dependencies..."
