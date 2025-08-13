@@ -161,6 +161,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       
+      // First check if email already exists
+      const { data: emailCheck, error: checkError } = await supabase
+        .rpc('check_email_exists', { email_param: email });
+      
+      if (checkError) {
+        console.error('Email check error:', checkError);
+        // Continue with signup if check fails
+      } else if (emailCheck?.exists) {
+        // Email already exists
+        if (emailCheck.email_confirmed) {
+          throw new Error('User already registered');
+        } else {
+          throw new Error('Email not confirmed');
+        }
+      }
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -170,37 +186,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw error;
       }
 
-      // Check if user needs verification
-      // This happens when:
-      // 1. User was created but no session exists (email confirmation required)
-      // 2. User exists but email is not confirmed
-      const needsVerification = data.user && (
-        !data.session || 
-        !data.user.email_confirmed_at
-      );
-
-      // Create profile for all new users
+      // Handle successful signup
       if (data.user) {
-        try {
-          await supabase
-            .from('profiles')
-            .insert([
-              {
-                id: data.user.id,
-                username: null,
-                default_currency: 'USD',
-                age_group: null,
-                gender: null,
-                country: null,
-              },
-            ]);
-        } catch (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Don't throw here, as the user account was created successfully
+        const needsVerification = !data.session || !data.user.email_confirmed_at;
+
+        // Profile creation is now handled by database trigger
+        // No need to manually create profile here
+
+        // Handle terms acceptance for new users (only if email is confirmed)
+        if (acceptedTerms && !needsVerification) {
+          try {
+            await dataService.acceptTermsAndPrivacy(data.user.id);
+          } catch (termsError) {
+            console.error('Terms acceptance error:', termsError);
+            // Don't fail the signup process if terms recording fails
+          }
         }
+
+        return { needsVerification: !!needsVerification };
       }
 
-      return { needsVerification: !!needsVerification };
+      // No user returned - this shouldn't happen
+      return { needsVerification: false };
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;
@@ -293,17 +300,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const updateProfile = async (profileData: Partial<User>) => {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Profile update timed out after 30 seconds')), 30000);
+    });
+
     try {
       if (!user) {
         throw new Error('No user logged in');
       }
 
+      console.log('Starting profile update for user:', user.id, 'with data:', profileData);
+
       // If updating username, check availability first
       if (profileData.username && profileData.username !== user.username) {
-        const isAvailable = await checkUsernameAvailability(profileData.username);
+        console.log('Checking username availability for:', profileData.username);
+        const availabilityPromise = checkUsernameAvailability(profileData.username);
+        const isAvailable = await Promise.race([availabilityPromise, timeoutPromise]);
+        
         if (!isAvailable) {
           throw new Error('Username is already taken');
         }
+        console.log('Username is available');
       }
 
       const updateData: any = {};
@@ -314,14 +331,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (profileData.country !== undefined) updateData.country = profileData.country;
       if (profileData.monthlySurvivalBudget !== undefined) updateData.monthly_survival_budget = profileData.monthlySurvivalBudget;
 
-      const { error } = await supabase
+      console.log('Updating profile with data:', updateData);
+
+      const updatePromise = supabase
         .from('profiles')
         .update(updateData)
         .eq('id', user.id);
 
+      const { error } = await Promise.race([updatePromise, timeoutPromise]);
+
       if (error) {
+        console.error('Supabase update error:', error);
         throw error;
       }
+
+      console.log('Profile update successful');
 
       // Update local user state
       setUser(prevUser => prevUser ? { ...prevUser, ...profileData } : null);

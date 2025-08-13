@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -42,6 +42,13 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleBudgetChange = (text: string) => {
     const formatted = formatNumberWithCommas(text);
@@ -164,13 +171,15 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation
       return;
     }
 
+    if (!isMountedRef.current) return;
+
     setIsLoading(true);
     try {
       const budgetValue = monthlySurvivalBudget ? parseFloat(removeCommas(monthlySurvivalBudget)) : null;
       
       if (monthlySurvivalBudget && (isNaN(budgetValue!) || budgetValue! < 0)) {
         Alert.alert('Error', 'Please enter a valid monthly survival budget amount');
-        setIsLoading(false);
+        if (isMountedRef.current) setIsLoading(false);
         return;
       }
 
@@ -182,13 +191,19 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation
         monthlySurvivalBudget: budgetValue,
       });
       
-      Alert.alert('Success', 'Profile updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      if (isMountedRef.current) {
+        Alert.alert('Success', 'Profile updated successfully', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      if (isMountedRef.current) {
+        Alert.alert('Error', error.message || 'Failed to update profile');
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
