@@ -94,15 +94,25 @@ export class AppStateService {
 
   private async handleAppReturningToForeground(timeInBackground: number) {
     try {
-      // Always refresh if app was in background for more than 5 minutes
-      if (timeInBackground > 5 * 60 * 1000) {
+      logger.info('App returning to foreground after', Math.round(timeInBackground / 1000), 'seconds');
+
+      // Always refresh if app was in background for more than 2 minutes
+      if (timeInBackground > 2 * 60 * 1000) {
         logger.info('App was in background for', Math.round(timeInBackground / 60000), 'minutes, refreshing session');
         await this.refreshSession();
         return;
       }
 
-      // Check if Supabase session is still valid
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // Check if Supabase session is still valid with timeout
+      const sessionCheckPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Session check timeout')), 10000);
+      });
+
+      const { data: { session }, error } = await Promise.race([
+        sessionCheckPromise,
+        timeoutPromise
+      ]) as any;
       
       if (error) {
         logger.warn('Session check failed:', error);
@@ -111,24 +121,25 @@ export class AppStateService {
       }
 
       if (!session) {
-        logger.warn('No active session found');
+        logger.warn('No active session found after background');
         return;
       }
 
-      // Check if session is close to expiring (within 5 minutes)
+      // Check if session is close to expiring (within 10 minutes)
       const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
       const timeUntilExpiry = expiresAt - Date.now();
       
-      if (timeUntilExpiry < 5 * 60 * 1000) {
+      if (timeUntilExpiry < 10 * 60 * 1000) {
         logger.info('Session expires soon, refreshing');
         await this.refreshAuthSession();
       }
 
-      // Always refresh data when returning to foreground
+      // Always refresh data when returning to foreground to ensure UI is up to date
       await this.refreshSession();
 
     } catch (error) {
       logger.error('Error handling foreground return:', error);
+      // Force refresh on any error to ensure app state is consistent
       await this.refreshSession();
     }
   }

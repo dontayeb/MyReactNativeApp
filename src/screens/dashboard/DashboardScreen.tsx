@@ -15,6 +15,7 @@ import { ProfileCompletionBanner } from '../../components/ProfileCompletionBanne
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { DashboardSkeleton } from '../../components/LoadingStates';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useDataLoader } from '../../hooks/useDataLoader';
 
 interface DashboardScreenProps {
   navigation?: any;
@@ -68,37 +69,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
   const { user } = useAuth();
   const { defaultCurrency } = useCurrency();
 
-  // Dynamic data from Supabase
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Register for app state refresh
-  useEffect(() => {
-    appStateService.onSessionRefresh(async () => {
-      if (user?.id) {
-        console.log('Dashboard: Refreshing data after app state change');
-        await loadUserData();
+  // Use the new data loader hook with better error handling and timeouts
+  const {
+    data: dashboardData,
+    isLoading,
+    error,
+    retry,
+    refresh
+  } = useDataLoader(
+    async () => {
+      if (!user?.id) {
+        throw new Error('No user found');
       }
-    });
-  }, [user?.id]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.id) {
-        loadUserData();
-      }
-    }, [user?.id])
-  );
-
-  const loadUserData = async () => {
-    if (!user?.id) return;
-    
-    try {
-      setIsLoading(true);
-      console.log('Loading data for user:', user.id);
+      console.log('Loading dashboard data for user:', user.id);
       
-      // Load loans and assets from Supabase
+      // Load loans and assets from Supabase with proper error handling
       const [loansData, assetsData] = await Promise.all([
         dataService.getLoans(user.id),
         dataService.getAssets(user.id)
@@ -107,44 +93,77 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
       console.log('Loaded loans:', loansData.length);
       console.log('Loaded assets:', assetsData.length);
 
-      // Convert Supabase data to component format
-      const formattedLoans = loansData.map(loan => ({
-        id: loan.id,
-        lender: loan.name,
-        amount: loan.principal || 0,
-        interestRate: loan.interest_rate,
-        remainingBalance: loan.current_balance || loan.principal || 0, // Will be recalculated by calculateCurrentBalance
-        loanTerm: loan.term_months || 0,
-        startDate: loan.start_date || '',
-        currency: loan.currency,
-        type: loan.loan_type as 'amortized' | 'credit_card' | 'line_of_credit',
-        creditLimit: loan.credit_limit || 0,
-        currentBalance: loan.current_balance || 0,
-        minimumPaymentPercentage: loan.minimum_payment_percentage || 0,
-        dueDate: loan.due_date || '',
-        statementDate: loan.statement_date || ''
-      }));
-
-      const formattedAssets = assetsData.map(asset => ({
-        id: asset.id,
-        name: asset.name,
-        type: asset.type as 'bank' | 'investment' | 'property' | 'vehicle' | 'other',
-        value: asset.value,
-        change: 0, // We don't track changes yet
-        changePercent: 0,
-        symbol: undefined,
-        last_valued: asset.last_valued,
-        currency: asset.currency || defaultCurrency
-      }));
-
-      setLoans(formattedLoans);
-      setAssets(formattedAssets);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setIsLoading(false);
+      return { loansData, assetsData };
+    },
+    [user?.id], // Dependencies - reload when user changes
+    {
+      timeout: 20000, // 20 second timeout
+      retryAttempts: 2,
+      retryDelay: 2000,
+      skipIfNoUser: true
     }
-  };
+  );
+
+  // Register for app state refresh
+  useEffect(() => {
+    appStateService.onSessionRefresh(async () => {
+      if (user?.id) {
+        console.log('Dashboard: Refreshing data after app state change');
+        await refresh();
+      }
+    });
+  }, [user?.id, refresh]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id && dashboardData === null && !isLoading) {
+        refresh();
+      }
+    }, [user?.id, refresh, dashboardData, isLoading])
+  );
+
+  // Process the raw data into component format
+  const processedData = React.useMemo(() => {
+    if (!dashboardData) {
+      return { loans: [], assets: [] };
+    }
+
+    const { loansData, assetsData } = dashboardData;
+
+    // Convert Supabase data to component format
+    const formattedLoans = loansData.map(loan => ({
+      id: loan.id,
+      lender: loan.name,
+      amount: loan.principal || 0,
+      interestRate: loan.interest_rate,
+      remainingBalance: loan.current_balance || loan.principal || 0,
+      loanTerm: loan.term_months || 0,
+      startDate: loan.start_date || '',
+      currency: loan.currency,
+      type: loan.loan_type as 'amortized' | 'credit_card' | 'line_of_credit',
+      creditLimit: loan.credit_limit || 0,
+      currentBalance: loan.current_balance || 0,
+      minimumPaymentPercentage: loan.minimum_payment_percentage || 0,
+      dueDate: loan.due_date || '',
+      statementDate: loan.statement_date || ''
+    }));
+
+    const formattedAssets = assetsData.map(asset => ({
+      id: asset.id,
+      name: asset.name,
+      type: asset.type as 'bank' | 'investment' | 'property' | 'vehicle' | 'other',
+      value: asset.value || 0,
+      change: 0, // We don't track changes yet
+      changePercent: 0,
+      symbol: undefined,
+      last_valued: asset.last_valued,
+      currency: asset.currency || defaultCurrency
+    }));
+
+    return { loans: formattedLoans, assets: formattedAssets };
+  }, [dashboardData, defaultCurrency]);
+
+  const { loans, assets } = processedData;
 
   const calculateMonthlyPayment = (loan: Loan) => {
     const principal = loan.amount;
@@ -756,7 +775,43 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
       color: theme.colors.textSecondary,
       marginLeft: 4,
     },
+    errorText: {
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+    },
+    retryButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    retryButtonText: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.greeting}>Welcome back, {user?.username}!</Text>
+          <Text style={styles.subtitle}>Here's your financial overview</Text>
+        </View>
+        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+          <Ionicons name="warning-outline" size={48} color={theme.colors.textSecondary} />
+          <Text style={[styles.errorText, { textAlign: 'center', marginTop: 16, marginBottom: 20 }]}>
+            {error}
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={retry}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
