@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { dataService } from '../services/dataService';
 import { encryptionService } from '../services/encryptionService';
 import { secureOfflineStorageService } from '../services/secureOfflineStorageService';
+import { validateUsername } from '../utils/usernameUtils';
 import { appStateService } from '../services/appStateService';
 import { User } from '../types';
 
@@ -311,16 +312,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('Starting profile update for user:', user.id, 'with data:', profileData);
 
-      // If updating username, check availability first
+      // If updating username, validate and check availability first
       if (profileData.username && profileData.username !== user.username) {
-        console.log('Checking username availability for:', profileData.username);
+        console.log('Validating and checking username availability for:', profileData.username);
+        
+        // First validate the username format
+        const validation = validateUsername(profileData.username);
+        if (!validation.isValid) {
+          throw new Error(validation.error || 'Invalid username');
+        }
+        
+        // Then check availability
         const availabilityPromise = checkUsernameAvailability(profileData.username);
         const isAvailable = await Promise.race([availabilityPromise, timeoutPromise]);
         
         if (!isAvailable) {
           throw new Error('Username is already taken');
         }
-        console.log('Username is available');
+        console.log('Username is valid and available');
       }
 
       const updateData: any = {};

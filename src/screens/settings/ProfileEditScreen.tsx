@@ -8,6 +8,7 @@ import { useCurrency } from '../../contexts/CurrencyContext';
 import { Ionicons } from '@expo/vector-icons';
 import { AgeGroup, Gender, Country } from '../../types';
 import { Dropdown } from '../../components/Dropdown';
+import { validateUsername } from '../../utils/usernameUtils';
 
 interface ProfileEditScreenProps {
   navigation: any;
@@ -166,9 +167,13 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation
   };
 
   const handleSave = async () => {
-    if (username && username.length < 3) {
-      Alert.alert('Error', 'Username must be at least 3 characters long');
-      return;
+    // Validate username if provided
+    if (username) {
+      const validation = validateUsername(username);
+      if (!validation.isValid) {
+        Alert.alert('Error', validation.error || 'Invalid username');
+        return;
+      }
     }
 
     if (!isMountedRef.current) return;
