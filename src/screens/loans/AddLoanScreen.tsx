@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -16,13 +16,18 @@ import { formatCurrencyAmount } from '../../utils/currencyUtils';
 
 interface AddLoanScreenProps {
   navigation: any;
+  route?: any;
 }
 
-export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
+export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation, route }) => {
   const { theme } = useTheme();
   const { t } = useLocalization();
   const { defaultCurrency } = useCurrency();
   const { user } = useAuth();
+  
+  // Check if we're editing an existing loan
+  const editingLoan = route?.params?.loan;
+  const isEditing = !!editingLoan;
 
   const [formData, setFormData] = useState({
     lender: '',
@@ -72,6 +77,38 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
     value: curr.code,
     label: `${curr.code} - ${curr.name}`
   }));
+
+  // Populate form when editing an existing loan
+  useEffect(() => {
+    if (isEditing && editingLoan) {
+      const loan = editingLoan;
+      setFormData({
+        lender: loan.lender || '',
+        type: loan.type || 'amortized',
+        amount: formatNumberWithCommas(loan.amount?.toString() || ''),
+        loanTerm: loan.loanTerm?.toString() || '',
+        startDate: loan.startDate || '',
+        creditLimit: formatNumberWithCommas(loan.creditLimit?.toString() || ''),
+        currentBalance: formatNumberWithCommas(loan.currentBalance?.toString() || ''),
+        minimumPaymentPercentage: loan.minimumPaymentPercentage?.toString() || '',
+        dueDate: loan.dueDate || '',
+        statementDate: loan.statementDate || '',
+        interestRate: loan.interestRate?.toString() || '',
+        currency: loan.currency || defaultCurrency,
+      });
+      
+      // Set date values for pickers
+      if (loan.startDate) {
+        setStartDateValue(new Date(loan.startDate));
+      }
+      if (loan.dueDate) {
+        setDueDateValue(new Date(loan.dueDate));
+      }
+      if (loan.statementDate) {
+        setStatementDateValue(new Date(loan.statementDate));
+      }
+    }
+  }, [isEditing, editingLoan, defaultCurrency]);
 
   const handleInputChange = (field: string, value: string) => {
     // Format money fields with commas
@@ -190,7 +227,8 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
         // Calculate minimum payment for credit cards/lines of credit
         const minimumPayment = (numericBalance * numericMinPercent) / 100;
         
-        const newLoan = await dataService.createLoan({
+        let newLoan;
+        const loanData = {
           user_id: user.id,
           name: formData.lender,
           loan_type: formData.type,
@@ -215,25 +253,39 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
           last_payment_amount: null,
           days_past_due: null,
           total_fees_charged: null,
-        });
+        };
+
+        if (isEditing) {
+          newLoan = await dataService.updateLoan(editingLoan.id, loanData);
+        } else {
+          newLoan = await dataService.createLoan(loanData);
+        }
 
         // Schedule payment reminders for credit card/line of credit
         if (newLoan && newLoan.id && formData.dueDate) {
           try {
+            console.log('Scheduling payment reminders for credit card/line of credit');
             // Schedule reminders for the next 12 months for credit cards
             const dueDate = new Date(formData.dueDate);
+            let scheduledCount = 0;
+            
             for (let i = 0; i < 12; i++) {
               const nextDueDate = new Date(dueDate);
               nextDueDate.setMonth(nextDueDate.getMonth() + i);
               
-              await notificationService.schedulePaymentReminder(
-                newLoan.id.toString(),
-                formData.lender,
-                nextDueDate,
-                minimumPayment,
-                formData.currency
-              );
+              // Only schedule if the due date is in the future
+              if (nextDueDate > new Date()) {
+                await notificationService.schedulePaymentReminder(
+                  newLoan.id.toString(),
+                  formData.lender,
+                  nextDueDate,
+                  minimumPayment,
+                  formData.currency
+                );
+                scheduledCount++;
+              }
             }
+            console.log(`Scheduled ${scheduledCount} payment reminders for credit card`);
           } catch (error) {
             console.error('Error scheduling payment reminders:', error);
           }
@@ -241,12 +293,12 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
 
         Alert.alert(
           'Success',
-          `${formData.type === 'credit_card' ? 'Credit card' : 'Line of credit'} added successfully!`,
+          `${formData.type === 'credit_card' ? 'Credit card' : 'Line of credit'} ${isEditing ? 'updated' : 'added'} successfully!`,
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
       } catch (error) {
         console.error('Error creating loan:', error);
-        Alert.alert('Error', 'Failed to add loan. Please try again.');
+        Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'add'} loan. Please try again.`);
       }
     } else {
       // Amortized loan validation
@@ -282,7 +334,8 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
       const monthlyPayment = calculateMonthlyPayment();
       
       try {
-        const newLoan = await dataService.createLoan({
+        let newLoan;
+        const loanData = {
           user_id: user.id,
           name: formData.lender,
           loan_type: formData.type,
@@ -307,25 +360,39 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
           last_payment_amount: null,
           days_past_due: null,
           total_fees_charged: null,
-        });
+        };
 
-        // Schedule payment reminders for the new loan
+        if (isEditing) {
+          newLoan = await dataService.updateLoan(editingLoan.id, loanData);
+        } else {
+          newLoan = await dataService.createLoan(loanData);
+        }
+
+        // Schedule payment reminders for the new loan (amortized loans only)
         if (newLoan && newLoan.id) {
           try {
+            console.log('Scheduling payment reminders for amortized loan');
             // Schedule reminders for the next 12 months
             const startDate = new Date(formData.startDate);
-            for (let i = 0; i < Math.min(numericTerm, 12); i++) {
+            let scheduledCount = 0;
+            
+            for (let i = 1; i <= Math.min(numericTerm, 12); i++) {
               const paymentDate = new Date(startDate);
               paymentDate.setMonth(paymentDate.getMonth() + i);
               
-              await notificationService.schedulePaymentReminder(
-                newLoan.id.toString(),
-                formData.lender,
-                paymentDate,
-                monthlyPayment,
-                formData.currency
-              );
+              // Only schedule if the payment date is in the future
+              if (paymentDate > new Date()) {
+                await notificationService.schedulePaymentReminder(
+                  newLoan.id.toString(),
+                  formData.lender,
+                  paymentDate,
+                  monthlyPayment,
+                  formData.currency
+                );
+                scheduledCount++;
+              }
             }
+            console.log(`Scheduled ${scheduledCount} payment reminders for loan`);
           } catch (error) {
             console.error('Error scheduling payment reminders:', error);
           }
@@ -333,14 +400,47 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
 
         Alert.alert(
           'Success',
-          `Loan added successfully!\nMonthly Payment: ${formatCurrency(monthlyPayment)}`,
+          `Loan ${isEditing ? 'updated' : 'added'} successfully!\nMonthly Payment: ${formatCurrency(monthlyPayment)}`,
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
       } catch (error) {
         console.error('Error creating loan:', error);
-        Alert.alert('Error', 'Failed to add loan. Please try again.');
+        Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'add'} loan. Please try again.`);
       }
     }
+  };
+
+  const handleDeleteLoan = async () => {
+    if (!isEditing || !editingLoan) return;
+    
+    Alert.alert(
+      'Delete Loan',
+      'Are you sure you want to delete this loan? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await dataService.deleteLoan(editingLoan.id);
+              Alert.alert(
+                'Success',
+                'Loan deleted successfully!',
+                [{ text: 'OK', onPress: () => {
+                  // Navigate back twice: once from the edit screen, once from the details screen
+                  navigation.goBack(); // Back to details screen
+                  setTimeout(() => navigation.goBack(), 100); // Back to loans list
+                }}]
+              );
+            } catch (error) {
+              console.error('Error deleting loan:', error);
+              Alert.alert('Error', 'Failed to delete loan. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const formatCurrency = (amount: number) => {
@@ -407,6 +507,20 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
     },
     picker: {
       color: theme.colors.text,
+    },
+    deleteButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderColor: '#FF3B30', // Red border
+      borderRadius: 12,
+      padding: 16,
+      alignItems: 'center',
+      marginTop: 20,
+    },
+    deleteButtonText: {
+      color: '#FF3B30', // Red text
+      fontSize: 16,
+      fontWeight: 'bold',
     },
     submitButton: {
       backgroundColor: theme.colors.primary,
@@ -503,7 +617,7 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Add Loan</Text>
+        <Text style={styles.title}>{isEditing ? 'Edit Loan' : 'Add Loan'}</Text>
       </View>
 
       <ScrollView 
@@ -776,8 +890,14 @@ export const AddLoanScreen: React.FC<AddLoanScreenProps> = ({ navigation }) => {
           </>
         )}
 
+        {isEditing && (
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteLoan}>
+            <Text style={styles.deleteButtonText}>Delete Loan</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Add Loan</Text>
+          <Text style={styles.submitButtonText}>{isEditing ? 'Update Loan' : 'Add Loan'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

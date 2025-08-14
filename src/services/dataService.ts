@@ -260,6 +260,12 @@ export const dataService = {
       throw error;
     }
 
+    // Invalidate loans cache so the loans screen refreshes
+    if (loan.user_id) {
+      const cacheKey = cacheService.getUserDataKey(loan.user_id, 'loans');
+      cacheService.remove(cacheKey);
+    }
+
     return data;
   },
 
@@ -272,6 +278,23 @@ export const dataService = {
       .single();
 
     if (error) {
+      throw error;
+    }
+
+    return data;
+  },
+
+  async getLoan(id: string): Promise<Loan | null> {
+    const { data, error } = await supabase
+      .from('loans')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
       throw error;
     }
 
@@ -301,13 +324,20 @@ export const dataService = {
   },
 
   async acceptTermsAndPrivacy(userId: string, termsVersion: string = '1.0', privacyVersion: string = '1.0'): Promise<void> {
+    // During signup, update profile directly to avoid foreign key constraint issues
+    // with the terms_acceptance_history table referencing auth.users
     const { error } = await supabase
-      .rpc('accept_terms_and_privacy', {
-        user_id_param: userId,
-        terms_version_param: termsVersion,
-        privacy_version_param: privacyVersion,
-        acceptance_method_param: 'signup'
-      });
+      .from('profiles')
+      .update({
+        terms_accepted: true,
+        terms_accepted_at: new Date().toISOString(),
+        terms_version: termsVersion,
+        privacy_policy_accepted: true,
+        privacy_policy_accepted_at: new Date().toISOString(),
+        privacy_policy_version: privacyVersion,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
 
     if (error) {
       throw error;
@@ -358,10 +388,19 @@ export const dataService = {
 
   // Newsletter subscription functions
   async subscribeToNewsletter(userId: string, source: string = 'app', preferences: any = {}): Promise<void> {
+    // Map potentially invalid sources to valid ones
+    const validSources = ['signup', 'app', 'settings', 'web', 'manual', 'import', 'promotion', 'referral'];
+    let validSource = validSources.includes(source) ? source : 'settings';
+    
+    // If the source is a variation, map it to the valid one
+    if (source.includes('settings') || source.includes('notification')) {
+      validSource = 'settings';
+    }
+    
     const { data, error } = await supabase
       .rpc('subscribe_to_newsletter', {
         user_id_param: userId,
-        source_param: source,
+        source_param: validSource,
         preferences_param: preferences
       });
 
