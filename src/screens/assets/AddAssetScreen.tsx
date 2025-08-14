@@ -69,6 +69,8 @@ export const AddAssetScreen: React.FC<AddAssetScreenProps> = ({ navigation }) =>
     setFormData(prev => ({ ...prev, lastValued: formatDate(currentDate) }));
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async () => {
     if (!user) {
       Alert.alert('Error', 'You must be logged in to add an asset');
@@ -91,8 +93,9 @@ export const AddAssetScreen: React.FC<AddAssetScreenProps> = ({ navigation }) =>
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      const newAsset = await dataService.createAsset({
+      console.log('Creating asset with data:', {
         user_id: user.id,
         name: formData.name,
         type: formData.type,
@@ -100,6 +103,24 @@ export const AddAssetScreen: React.FC<AddAssetScreenProps> = ({ navigation }) =>
         currency: formData.currency,
         last_valued: formData.lastValued,
       });
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Asset creation timed out after 30 seconds')), 30000);
+      });
+
+      const createAssetPromise = dataService.createAsset({
+        user_id: user.id,
+        name: formData.name,
+        type: formData.type,
+        value: numericValue,
+        currency: formData.currency,
+        last_valued: formData.lastValued,
+      });
+
+      const newAsset = await Promise.race([createAssetPromise, timeoutPromise]);
+
+      console.log('Asset created successfully:', newAsset);
 
       // Schedule valuation reminder notification (1 year from last valued date)
       if (newAsset && newAsset.id) {
@@ -109,8 +130,10 @@ export const AddAssetScreen: React.FC<AddAssetScreenProps> = ({ navigation }) =>
             formData.name,
             new Date(formData.lastValued)
           );
+          console.log('Asset valuation reminder scheduled');
         } catch (error) {
           console.error('Error scheduling asset valuation reminder:', error);
+          // Don't fail the entire operation if notification scheduling fails
         }
       }
 
@@ -119,9 +142,26 @@ export const AddAssetScreen: React.FC<AddAssetScreenProps> = ({ navigation }) =>
         'Asset added successfully! You\'ll be reminded to update its value in one year.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating asset:', error);
-      Alert.alert('Error', 'Failed to add asset. Please try again.');
+      
+      // Show more specific error message
+      let errorMessage = 'Failed to add asset. Please try again.';
+      if (error.message) {
+        if (error.message.includes('Validation failed')) {
+          errorMessage = `Validation error: ${error.message}`;
+        } else if (error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('Encryption')) {
+          errorMessage = 'Security initialization failed. Please try again.';
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -197,6 +237,10 @@ export const AddAssetScreen: React.FC<AddAssetScreenProps> = ({ navigation }) =>
       color: 'white',
       fontSize: 16,
       fontWeight: 'bold',
+    },
+    submitButtonDisabled: {
+      backgroundColor: theme.colors.textSecondary,
+      opacity: 0.6,
     },
     helpText: {
       fontSize: 12,
@@ -331,8 +375,14 @@ export const AddAssetScreen: React.FC<AddAssetScreenProps> = ({ navigation }) =>
           )}
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Add Asset</Text>
+        <TouchableOpacity 
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? 'Adding Asset...' : 'Add Asset'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
