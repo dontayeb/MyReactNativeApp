@@ -28,6 +28,27 @@
 ## Most Important
 **Challenge assumptions** - If I misunderstand the goal or context, correct me immediately. Better collaboration comes from understanding the real problem, not just implementing the stated solution.
 
+## Recommended MCP Tools
+
+### **High Priority MCPs:**
+- **`mcp-supabase`** or **`mcp-postgres`** - Direct database access to inspect schemas, run queries, check data
+- **`mcp-logs`** - Real-time log monitoring and analysis
+- **`mcp-shell`** - Better command execution with persistent sessions
+- **`mcp-expo`** - Direct Expo/EAS build monitoring and management
+- **`mcp-github-actions`** - Monitor and control GitHub workflows
+
+### **Medium Priority MCPs:**
+- **`mcp-fetch`** - Better web requests with monitoring capabilities
+- **`mcp-filesystem-extended`** - Enhanced file operations beyond basic read/write
+- **`mcp-react-native-elements`** - React Native UI components
+- **`mcp-jest`** or **`mcp-testing`** - Automated test execution and reporting
+
+### **Why These Help:**
+- **Debug database issues instantly** - See exact Supabase errors and data
+- **Monitor real-time app behavior** - Catch errors during development
+- **Better build management** - Monitor EAS builds and deployments
+- **Faster problem resolution** - Direct access to logs and system state
+
 ---
 
 *To activate these guidelines in future conversations, tell Claude to "read CLAUDE.md"*
